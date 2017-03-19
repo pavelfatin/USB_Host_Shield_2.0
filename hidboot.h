@@ -210,6 +210,7 @@ class HIDBoot : public USBHID //public USBDeviceConfig, public UsbConfigXtracter
         uint32_t qNextPollTime; // next poll time
         bool bPollEnable; // poll enable flag
         uint8_t bInterval; // largest interval
+        uint8_t bIntervalOverride; // poll interval override
         bool bRptProtoEnable; // Report Protocol enable flag
 
         void Initialize();
@@ -219,7 +220,7 @@ class HIDBoot : public USBHID //public USBDeviceConfig, public UsbConfigXtracter
         };
 
 public:
-        HIDBoot(USB *p, bool bRptProtoEnable = false);
+        HIDBoot(USB *p, bool bRptProtoEnable = false, uint8_t bIntervalOverride = 0);
 
         virtual bool SetReportParser(uint8_t id, HIDReportParser *prs) {
                 pRptParser[id] = prs;
@@ -253,11 +254,12 @@ public:
 };
 
 template <const uint8_t BOOT_PROTOCOL>
-HIDBoot<BOOT_PROTOCOL>::HIDBoot(USB *p, bool bRptProtoEnable/* = false*/) :
+HIDBoot<BOOT_PROTOCOL>::HIDBoot(USB *p, bool bRptProtoEnable/* = false*/, uint8_t bIntervalOverride/* = 0*/) :
 USBHID(p),
 qNextPollTime(0),
 bPollEnable(false),
-bRptProtoEnable(bRptProtoEnable) {
+bRptProtoEnable(bRptProtoEnable),
+bIntervalOverride(bIntervalOverride) {
         Initialize();
 
         for(int i = 0; i < epMUL(BOOT_PROTOCOL); i++) {
@@ -578,7 +580,9 @@ template <const uint8_t BOOT_PROTOCOL>
 uint8_t HIDBoot<BOOT_PROTOCOL>::Poll() {
         uint8_t rcode = 0;
 
-        if(bPollEnable && ((long)(millis() - qNextPollTime) >= 0L)) {
+        uint32_t time = millis();
+
+        if(bPollEnable && ((long)(time - qNextPollTime) >= 0L)) {
 
                 // To-do: optimize manually, using the for loop only if needed.
                 for(int i = 0; i < epMUL(BOOT_PROTOCOL); i++) {
@@ -619,7 +623,7 @@ uint8_t HIDBoot<BOOT_PROTOCOL>::Poll() {
                         }
 
                 }
-                qNextPollTime = millis() + bInterval;
+                qNextPollTime = time + (bIntervalOverride > 0 ? bIntervalOverride: bInterval);
         }
         return rcode;
 }
